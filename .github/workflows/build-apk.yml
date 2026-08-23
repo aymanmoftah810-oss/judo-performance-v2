@@ -30,7 +30,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: '17'
 
       - name: Build Debug APK
         working-directory: android
@@ -40,5 +40,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: judo-performance-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk0
-
+          path: android/app/build/outputs/apk/debug/app-debug.apk
