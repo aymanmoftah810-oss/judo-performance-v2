@@ -1,14 +1,14 @@
 import { normalizeDigits } from "../utils/normalizeDigits.js";
 import { PLAYER_STATUSES, GENDERS } from "../models/Player.js";
 import { eventBus } from "../core/EventBus.js";
+import { ValidationError } from "./errors.js";
+export { ValidationError };
 
 /**
  * ValidationError — thrown by PlayerService when input data is invalid.
  * The UI layer catches this and shows the message as a toast; it never
  * has to know the validation rules itself.
  */
-export class ValidationError extends Error {}
-
 function validate(data) {
   const name = (data.name || "").trim();
   if (!name) throw new ValidationError("الرجاء إدخال اسم اللاعب");
@@ -38,11 +38,15 @@ function validate(data) {
     birthYear,
     weight,
     gender: data.gender || "ذكر",
-    status: data.status || "مقيد",
+    status: data.status || "active",
     membershipNo: normalizeDigits(String(data.membershipNo ?? "")).trim(),
+    playerCode: normalizeDigits(String(data.playerCode ?? data.membershipNo ?? "")).trim(),
     phone: normalizeDigits(String(data.phone ?? "")).trim(),
     belt: (data.belt || "").trim(),
     club: (data.club || "").trim(),
+    address: (data.address || "").trim(),
+    groupId: data.groupId ? Number(normalizeDigits(String(data.groupId))) : null,
+    joinDate: (data.joinDate || "").trim() || undefined,
     notes: (data.notes || "").trim(),
   };
 }
@@ -85,11 +89,28 @@ export class PlayerService {
     return this._repo.getPlayer(id);
   }
 
-  async getAllPlayers() {
-    return this._repo.getAllPlayers();
+  /**
+   * @param {{status?:string, groupId?:number, sortBy?:"name"|"joinDate"|"birthYear", sortDir?:"asc"|"desc"}} [opts]
+   */
+  async getAllPlayers(opts = {}) {
+    const players = await this._repo.getAllPlayers({ status: opts.status, groupId: opts.groupId });
+    return sortPlayers(players, opts.sortBy, opts.sortDir);
   }
 
-  async searchPlayers(query) {
-    return this._repo.searchPlayers(query);
+  async searchPlayers(query, opts = {}) {
+    const players = await this._repo.searchPlayers(query, opts);
+    return sortPlayers(players, opts.sortBy, opts.sortDir);
   }
+}
+
+function sortPlayers(players, sortBy, sortDir = "asc") {
+  if (!sortBy) return players;
+  const sorted = [...players].sort((a, b) => {
+    const av = a[sortBy] ?? "";
+    const bv = b[sortBy] ?? "";
+    if (av < bv) return -1;
+    if (av > bv) return 1;
+    return 0;
+  });
+  return sortDir === "desc" ? sorted.reverse() : sorted;
 }

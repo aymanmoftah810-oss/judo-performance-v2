@@ -20,6 +20,15 @@ async function main() {
 
   await page.goto(BASE_URL, { waitUntil: "networkidle" });
 
+  // Phase 2 changed the default landing route to Dashboard (per spec) -
+  // navigate to Players explicitly, same as a real user would via the nav bar.
+  const playersNavBtn = await page.$('[data-nav="players"]');
+  if (playersNavBtn) {
+    await playersNavBtn.click();
+  } else {
+    await page.goto(BASE_URL + "#/players", { waitUntil: "networkidle" });
+  }
+
   // Sanity: modules actually loaded (no CORS/module errors on first paint)
   await page.waitForSelector("#add-player-btn", { timeout: 5000 }).catch(() => {});
   const hasAddBtn = await page.$("#add-player-btn");

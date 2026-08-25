@@ -1,129 +1,119 @@
-# مسار — نظام إدارة أداء لاعبي الجودو (v2.0 — Phase 1)
+# مسار — نظام إدارة أداء لاعبي الجودو (v2.0 — Phase 2)
 
-نظام Modular لإدارة اللاعبين وتقييم أدائهم البدني، مصمم ليعمل Offline بالكامل
-ويكون جاهزًا مستقبلًا للمزامنة السحابية وتطبيق أندرويد (APK).
+نظام Modular لإدارة اللاعبين، المجموعات، الاختبارات الرياضية، الحضور، وتحليل
+الأداء — يعمل Offline بالكامل، جاهز لاحقًا للمزامنة السحابية وتطبيق أندرويد.
 
-**هذه نسخة Phase 1 فقط**: وحدة اللاعبين (Players) شغّالة بالكامل بالمعمارية
-الجديدة. باقي الوحدات (الاختبارات، الحضور، بطاقة اللاعب، لوحة التحكم...)
-هتُبنى في المراحل التالية حسب الخطة المتفق عليها.
+**Phase 1 + Phase 2 مكتملتين.** كل شاشات الاستخدام اليومي شغّالة: الرئيسية
+(Dashboard)، اللاعبون، الاختبارات، الحضور، التقارير، الإعدادات.
 
 ## طريقة التشغيل
 
 ### للمستخدم العادي (ويندوز)
 دبل كليك على **`start.bat`** — هيفتح البرنامج تلقائيًا في المتصفح على
 `http://localhost:8080`. سيبقى صندوق الأوامر (الأسود) مفتوح طول فترة
-الاستخدام — متقفلوش.
-
-**ملاحظة**: لازم يكون عندك Python مثبّت على جهازك (أغلب أجهزة ويندوز
-الحديثة عندها بالفعل، أو حمّله من [python.org](https://www.python.org/downloads/)
-واختر "Add Python to PATH" أثناء التثبيت).
+الاستخدام — متقفلوش. (لازم Python مثبّت — أغلب أجهزة ويندوز عندها بالفعل،
+أو حمّله من [python.org](https://www.python.org/downloads/) واختر
+"Add Python to PATH" أثناء التثبيت.)
 
 ### للمطور (أي نظام تشغيل)
 ```bash
 npm run dev
 ```
-أو أي سيرفر ملفات ثابتة تانِ (`npx serve`, `php -S localhost:8080`, إلخ) —
-المهم إنه يشتغل من **جذر مجلد المشروع** (نفس المجلد اللي فيه `index.html`).
 
 ⚠️ **لازم تشغّل سيرفر محلي** — الملف مش هيشتغل بفتحه مباشرة بالدبل كليك
-(`file://`) بسبب قيود المتصفحات الأمنية على ES Modules. هذا قرار معماري
-مقصود (راجع قسم "لماذا ES Modules" تحت).
+(`file://`) بسبب قيود المتصفحات على ES Modules. قرار معماري مقصود (يخدم
+التحويل لـ PWA/APK لاحقًا بدون إعادة هيكلة).
 
 ## بنية المشروع
 
 ```
 judo-performance-v2/
-├── index.html              نقطة الدخول
-├── start.bat                تشغيل سريع على ويندوز
-├── package.json
+├── index.html, package.json, start.bat, capacitor.config.json
 ├── styles/main.css
+├── scripts/sync-www.mjs        ينسخ src/styles/index.html إلى www/ (راجع قسم Capacitor تحت)
 ├── src/
-│   ├── core/
-│   │   ├── App.js            composition root - الوحيد اللي يعرف أي Adapter مستخدم فعليًا
-│   │   ├── Router.js          توجيه بسيط بين الوحدات (Hash-based)
-│   │   ├── Store.js           (محجوز - غير مستخدم في Phase 1)
-│   │   ├── EventBus.js        pub/sub بين الوحدات
-│   │   └── ErrorHandler.js    يظهر أي خطأ JS كرسالة مرئية بدل فشل صامت
+│   ├── core/            App.js (composition root), Router, Store, EventBus,
+│   │                    ErrorHandler, Navigation
 │   ├── database/
-│   │   ├── adapters/
-│   │   │   ├── StorageAdapter.js       العقد (interface) المشترك
-│   │   │   └── LocalStorageAdapter.js  التنفيذ الحالي (Phase 1)
-│   │   └── repositories/
-│   │       └── PlayerRepository.js     يعرف "شكل" تخزين اللاعبين، ولا يعرف أي Adapter
-│   ├── services/
-│   │   └── PlayerService.js   منطق العمل والتحقق (Validation) - لا يعرف التخزين إطلاقًا
-│   ├── models/
-│   │   └── Player.js          شكل بيانات اللاعب
-│   ├── modules/
-│   │   └── players/
-│   │       └── PlayersModule.js   واجهة الاستخدام (UI) - تعرف Service بس
-│   └── utils/
-│       ├── normalizeDigits.js  تطبيع الأرقام العربية (درس من نسخة سابقة - راجع الملف)
-│       └── toast.js
+│   │   ├── adapters/     StorageAdapter (عقد)، LocalStorageAdapter (التنفيذ الحالي)
+│   │   ├── repositories/ BaseRepository (مشترك) + Player/Group/Test/
+│   │   │                 TestResult/Standards/Attendance Repository
+│   │   └── seeds/        بيانات المعايير الحقيقية (600 معيار) + دالة الربط بـ testId
+│   ├── services/         Player/Group/Test/Evaluation/TestResult/
+│   │                     Attendance/PerformanceAnalysis Service + errors.js
+│   ├── models/           Player, Group, Test, TestResult, Standard,
+│   │                     Attendance, AgeCategory
+│   ├── modules/          dashboard/ players/ tests/ attendance/ reports/ settings/
+│   └── utils/            normalizeDigits, toast
+├── www/                  نسخة مطابقة لـ src/styles/index.html (يقرأها Capacitor)
+├── android/               مشروع Capacitor/Android (لا يُعدَّل يدويًا)
+├── .github/workflows/     بناء APK تلقائي عند git push
 └── tests/
-    ├── arch-check.mjs          فحص ثابت: لا اعتماد مباشر على localStorage خارج الـ Adapter
-    └── e2e-players.spec.mjs    اختبار فعلي بمتصفح حقيقي (Playwright)
+    ├── arch-check.mjs           فحص معماري ثابت
+    ├── phase1-node-test.mjs     منطق اللاعبين (بدون متصفح)
+    ├── phase2-node-test.mjs     كل أنظمة Phase 2 (بدون متصفح)
+    ├── e2e-players.spec.mjs     اختبار متصفح حقيقي - اللاعبين
+    └── e2e-phase2.spec.mjs      اختبار متصفح حقيقي - كل الـ Definition of Done
 ```
 
-## المعمارية (لماذا الشكل ده)
+## المعمارية
 
 ```
-Player UI (PlayersModule)
-      ↓  (يستخدم فقط)
-PlayerService                 ← منطق العمل + التحقق من صحة البيانات
-      ↓  (يستخدم فقط)
-PlayerRepository               ← يعرف "شكل" التخزين (المفاتيح)، لا يعرف الـ Adapter المحدد
-      ↓  (يستخدم فقط عبر الواجهة)
-StorageAdapter (interface)
-      ↓
-LocalStorageAdapter  (Phase 1)  ← الوحيد المسموح له يلمس localStorage مباشرة
-IndexedDBAdapter     (Phase 2)  ← نفس الواجهة بالضبط، هتحل محل اللي فوق
+UI (Module)  →  Service (منطق العمل + Validation)  →  Repository (شكل التخزين)  →  StorageAdapter (عقد)  →  LocalStorageAdapter
 ```
 
-**القاعدة الذهبية**: `PlayerService` و `PlayersModule` **لا يعرفان إطلاقًا**
-هل التخزين حاليًا localStorage أم IndexedDB. في Phase 2 هيتغير سطر واحد بس
-في `App.js` (استبدال `LocalStorageAdapter` بـ `IndexedDBAdapter`)، وكل حاجة
-تانية في المشروع تفضل زي ما هي.
+نفس القاعدة من Phase 1: `App.js` هو المكان الوحيد اللي يعرف فيه Adapter
+مُستخدم فعليًا. كل الـ Services والـ UI Modules بتتعامل مع Interfaces/Services
+محقونة (Dependency Injection)، مفيش أي منها بيلمس `localStorage` مباشرة —
+اتفحص هذا آليًا (`npm run test:arch`) وهو بيغطي كل ملفات Phase 2 الجديدة
+كمان، مش بس Phase 1.
 
-### شكل التخزين
-كل لاعب بيتخزن في مفتاح منفصل (مش كائن STATE واحد ضخم زي النسخة القديمة):
+### شكل التخزين (كل Entity في مفاتيح منفصلة، مش كائن واحد ضخم)
 ```
-judo:player:1  →  { id:1, name:"...", ... }
-judo:player:2  →  { id:2, name:"...", ... }
-judo:meta:playerNextId  →  3
+judo:player:1, judo:player:2, ...        judo:meta:playerNextId
+judo:group:1, ...                        judo:meta:groupNextId
+judo:test:1..10 (الاختبارات العشرة)      judo:meta:testNextId
+judo:standard:1..600 (المعايير الحقيقية) judo:meta:standardNextId
+judo:testresult:1, ...                   judo:meta:testresultNextId
+judo:attendance:1, ...                   judo:meta:attendanceNextId
 ```
-هذا يخلي الانتقال لـ IndexedDB طبيعي جدًا (كل مفتاح = سجل واحد).
 
-### لماذا ES Modules وسيرفر محلي (مش دبل كليك)؟
-اخترنا `import`/`export` حقيقية بدل تجميع كل حاجة في ملف واحد، عشان:
-1. فصل معماري نظيف وقابل للاختبار (كل طبقة ملف مستقل).
-2. البنية دي هي نفسها اللي هتتحول لـ PWA ثم APK (عبر Capacitor) لاحقًا —
-   وكلاهما أصلًا بيشتغلوا عبر سيرفر محلي/مصدر آمن، مش `file://`.
-القرار ده يوفر علينا إعادة هيكلة المشروع تاني وقت التحويل لـ APK.
+### التوافق مع بيانات Phase 1 (Migration)
+لاعبين Phase 1 (بحالات عربية: مقيد/حديث/متوقف، بدون الحقول الجديدة) بيتم
+ترقيتهم تلقائيًا وبدون فقد أي بيانات أول ما يُقرأوا (`PlayerRepository._normalize`):
+الحالة العربية تتحول لقيمة إنجليزية ثابتة (active/new/suspended) مع الاحتفاظ
+بعرضها بالعربي في الواجهة، والحقول الجديدة (playerCode, address, joinDate,
+groupId) بتاخد قيم افتراضية منطقية. مفيش خطوة يدوية مطلوبة، ومفيش داتا بتتحذف.
+
+## Capacitor / بناء APK
+
+`capacitor.config.json` بيحدد `webDir: "www"` — يعني Capacitor بيغلّف محتوى
+`www/` بس، مش `src/` مباشرة. **بعد أي تعديل في `src/` أو `styles/` أو
+`index.html`، شغّل**:
+```bash
+npm run sync:www
+```
+عشان `www/` يفضل مطابق تمامًا (السكريبت ده بيتأكد من التطابق، مش نسخ يدوي
+عرضة للنسيان). بعدها GitHub Actions (`.github/workflows/build-apk.yml`)
+بيشغّل `npx cap sync android` تلقائيًا عند كل `push` لـ `main`، وده بيحدّث
+مشروع الأندرويد الأصلي من `www/` قبل بناء الـ APK — مفيش حاجة تتعدل يدويًا
+جوه `android/`.
 
 ## الاختبارات (Tests)
 
-### فحص معماري (ثابت، بدون متصفح)
 ```bash
-node tests/arch-check.mjs
+npm run test:arch          # فحص معماري ثابت (كل الطبقات)
+node tests/phase1-node-test.mjs   # منطق اللاعبين
+npm run test:phase2        # كل أنظمة Phase 2 (هجرة، مجموعات، معايير، تقييم، حضور...)
+npm run test:e2e           # متصفح حقيقي - Phase 1
+npm run test:e2e:phase2    # متصفح حقيقي - كل الـ Definition of Done (يحتاج سيرفر شغّال على 8080)
 ```
-يتأكد إن `PlayerService.js` و `PlayersModule.js` و `PlayerRepository.js`
-لا يحتوون على أي إشارة مباشرة لـ `localStorage` — فقط `LocalStorageAdapter.js`
-مسموح له بكده.
+اختبارات المتصفح تحتاج `npm install -D playwright` وسيرفر محلي شغّال
+(`npm run dev`) في نافذة تانية قبل التشغيل.
 
-### اختبار فعلي بمتصفح حقيقي (يتطلب Playwright)
-```bash
-npm install -D playwright
-node tests/e2e-players.spec.mjs
-```
-يفتح التطبيق فعليًا، يضيف لاعب، يعدّله، يحذفه، ويتأكد إن البيانات بتفضل
-موجودة بعد إعادة تحميل الصفحة.
+## حالة التنفيذ
 
-## حالة التنفيذ الحالية
-
-**Phase 1 — Players Module: مكتملة ومُختبرة (راجع تقرير PHASE 1 في المحادثة).**
-
-المراحل القادمة (بانتظار التوجيه): قاعدة بيانات IndexedDB، فصل محرك التقييم،
-إخراج المعايير من الكود، شاشة إدارة المعايير، نظام الاختبارات الجماعي،
-الحضور، بطاقة اللاعب، لوحة التحكم، النسخ الاحتياطي، تجهيز المزامنة
-والتوثيق، ثم APK.
+**Phase 1 (اللاعبين) + Phase 2 (Dashboard، المجموعات، الاختبارات، المعايير،
+الحضور، التقارير، تحليل الأداء) — مكتملتين ومُختبرتين بالكامل.**
+راجع تقرير PHASE 2 في المحادثة للتفاصيل الدقيقة (الملفات، الاختبارات،
+القرارات المعمارية، والفجوات المعروفة المتبقية).

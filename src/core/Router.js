@@ -1,11 +1,12 @@
 /**
- * Router — minimal hash-based router. Phase 1 only registers one route
- * ("players"), but the mechanism supports adding more routes/modules in
- * later phases without changing this file's shape.
+ * Router — minimal hash-based router. Phase 1 only registered one route
+ * ("players"); Phase 2 adds more routes plus support for a single path
+ * parameter (e.g. "#/player/5") for deep-linkable screens like Player
+ * Profile, without changing how existing routes are registered/rendered.
  */
 export class Router {
   constructor() {
-    /** @type {Map<string, (container: HTMLElement) => void|Promise<void>>} */
+    /** @type {Map<string, (container: HTMLElement, param?: string) => void|Promise<void>>} */
     this._routes = new Map();
     this._container = null;
     this._defaultRoute = null;
@@ -24,21 +25,26 @@ export class Router {
 
   _currentRoute() {
     const hash = window.location.hash.replace(/^#\/?/, "");
-    return hash || this._defaultRoute;
+    const [route, param] = hash.split("/");
+    return { route: route || this._defaultRoute, param };
   }
 
   async _render() {
-    const route = this._currentRoute();
+    const { route, param } = this._currentRoute();
     const renderFn = this._routes.get(route);
     if (!this._container) return;
     if (!renderFn) {
       this._container.innerHTML = `<div class="empty-route">الصفحة غير موجودة: ${route}</div>`;
       return;
     }
-    await renderFn(this._container);
+    await renderFn(this._container, param);
   }
 
-  navigate(routeName) {
-    window.location.hash = "/" + routeName;
+  navigate(routeName, param) {
+    window.location.hash = "/" + routeName + (param !== undefined ? "/" + param : "");
+  }
+
+  currentRouteName() {
+    return this._currentRoute().route;
   }
 }

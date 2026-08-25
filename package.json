@@ -1,13 +1,16 @@
 {
   "name": "judo-performance-system",
-  "version": "2.0.0-phase1",
+  "version": "2.0.0-phase2",
   "description": "نظام إدارة وتقييم أداء لاعبي الجودو - Modular Offline-first architecture",
   "type": "module",
   "scripts": {
     "dev": "python3 -m http.server 8080 || python -m http.server 8080",
     "start": "npm run dev",
     "test:arch": "node tests/arch-check.mjs",
-    "test:e2e": "node tests/e2e-players.spec.mjs"
+    "test:e2e": "node tests/e2e-players.spec.mjs",
+    "test:phase2": "node tests/phase2-node-test.mjs",
+    "test:e2e:phase2": "node tests/e2e-phase2.spec.mjs",
+    "sync:www": "node scripts/sync-www.mjs"
   },
   "devDependencies": {
     "playwright": "^1.40.0"

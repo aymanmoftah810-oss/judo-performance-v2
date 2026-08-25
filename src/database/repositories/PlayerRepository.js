@@ -1,4 +1,4 @@
-import { createPlayerData } from "../../models/Player.js";
+import { createPlayerData, LEGACY_STATUS_MAP, PLAYER_STATUSES } from "../../models/Player.js";
 
 const PLAYER_PREFIX = "judo:player:";
 const NEXT_ID_KEY = "judo:meta:playerNextId";
@@ -16,11 +16,35 @@ const NEXT_ID_KEY = "judo:meta:playerNextId";
  *
  * This per-record layout is what makes the Phase 2 swap to IndexedDB
  * natural: each key becomes one IndexedDB record, no restructuring needed.
+ *
+ * PHASE 2: _normalize() below lazily migrates any Phase 1 record on every
+ * read — old Arabic status values (مقيد/حديث/متوقف) become the new
+ * canonical English enum, and any Phase 2 field missing from an old record
+ * (playerCode, address, joinDate, groupId) gets a sensible default. This is
+ * idempotent (already-migrated records pass through unchanged) and requires
+ * no explicit migration step or schema-version bookkeeping — existing
+ * players are never lost or altered destructively.
  */
 export class PlayerRepository {
   /** @param {import("../adapters/StorageAdapter.js").StorageAdapter} adapter */
   constructor(adapter) {
     this._adapter = adapter;
+  }
+
+  /** Lazily upgrade a Phase 1 (or older Phase 2) record to the current shape. */
+  _normalize(player) {
+    if (!player) return player;
+    let status = player.status;
+    if (LEGACY_STATUS_MAP[status]) status = LEGACY_STATUS_MAP[status];
+    if (!PLAYER_STATUSES.includes(status)) status = "active";
+    return {
+      ...player,
+      status,
+      playerCode: player.playerCode ?? player.membershipNo ?? "",
+      address: player.address ?? "",
+      joinDate: player.joinDate ?? (player.createdAt ? player.createdAt.slice(0, 10) : ""),
+      groupId: player.groupId ?? null,
+    };
   }
 
   async _nextId() {
@@ -43,17 +67,19 @@ export class PlayerRepository {
 
   /** @returns {Promise<import("../../models/Player.js").Player|null>} */
   async getPlayer(id) {
-    return this._adapter.get(PLAYER_PREFIX + id);
+    return this._normalize(await this._adapter.get(PLAYER_PREFIX + id));
   }
 
   /**
-   * @param {{includeDeleted?: boolean}} [opts]
+   * @param {{includeDeleted?: boolean, status?: string, groupId?: number}} [opts]
    * @returns {Promise<import("../../models/Player.js").Player[]>}
    */
   async getAllPlayers(opts = {}) {
     const rows = await this._adapter.list(PLAYER_PREFIX);
-    let players = rows.map(r => r.value).filter(Boolean);
+    let players = rows.map(r => this._normalize(r.value)).filter(Boolean);
     if (!opts.includeDeleted) players = players.filter(p => !p.deletedAt);
+    if (opts.status) players = players.filter(p => p.status === opts.status);
+    if (opts.groupId !== undefined) players = players.filter(p => p.groupId === opts.groupId);
     players.sort((a, b) => a.id - b.id);
     return players;
   }
@@ -64,9 +90,9 @@ export class PlayerRepository {
    * @returns {Promise<import("../../models/Player.js").Player>}
    */
   async updatePlayer(id, patch) {
-    const existing = await this.getPlayer(id);
+    const existing = await this._adapter.get(PLAYER_PREFIX + id);
     if (!existing) throw new Error(`Player ${id} not found`);
-    const updated = { ...existing, ...patch, id: existing.id, updatedAt: new Date().toISOString() };
+    const updated = { ...this._normalize(existing), ...patch, id: existing.id, updatedAt: new Date().toISOString() };
     await this._adapter.set(PLAYER_PREFIX + id, updated);
     return updated;
   }
@@ -77,7 +103,7 @@ export class PlayerRepository {
   }
 
   /**
-   * Case-insensitive search across name / membershipNo / phone.
+   * Case-insensitive search across name / membershipNo / playerCode / phone.
    * @param {string} query
    * @param {{includeDeleted?: boolean}} [opts]
    */
@@ -88,6 +114,7 @@ export class PlayerRepository {
     return all.filter(p =>
       (p.name || "").toLowerCase().includes(q) ||
       (p.membershipNo || "").toLowerCase().includes(q) ||
+      (p.playerCode || "").toLowerCase().includes(q) ||
       (p.phone || "").toLowerCase().includes(q)
     );
   }
